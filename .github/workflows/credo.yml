@@ -6,17 +6,21 @@ jobs:
   credo:
     name: Credo
     runs-on: ubuntu-latest
-    container:
-      image: elixir:1.12-slim
     steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab #v3.5.2
-      - name: Git configuration
-        run: git config --global --add safe.directory /github/workspace
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: '24'
+          elixir-version: '1.12'
       - name: Install Dependencies
         run: |
           mix local.rebar --force
           mix local.hex --force
           mix deps.get
+      - name: Git configuration
+        run: git config --global --add safe.directory ${{ github.workspace }}
       - name: Run Credo
         run: mix credo --format=flycheck --all --strict
       - name: Credo reviewdog
