@@ -1,30 +1,20 @@
-name: Sobelow
-
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  schedule:
-    - cron: '23 9 * * 3'
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
+name: reviewdog
+on: [pull_request]
 jobs:
-  security-scan:
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
+  credo:
+    name: runner / credo
     runs-on: ubuntu-latest
-
+    container:
+      image: elixir:1.12-slim
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab #v3.5.2
-      - id: run-action
-        uses: sobelow/action@1afd6d2cae70ae8bd900b58506f54487ed863912 #v1
-      - name: Upload report
-        uses: github/codeql-action/upload-sarif@d23060145bc9131d50558d5d4185494a20208101 #v2.12.5
+      - name: Install Dependencies
+        run: |
+          mix local.rebar --force
+          mix local.hex --force
+          mix deps.get
+      - name: credo
+        uses: red-shirts/reviewdog-action-credo@57671669d5e2170621e89536c7a031fb23264761 #v1.2
         with:
-          sarif_file: results.sarif
+          github_token: ${{ secrets.github_token }}
+          reporter: github-pr-review # Change reporter.
