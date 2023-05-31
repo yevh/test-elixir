@@ -13,29 +13,25 @@ permissions:
   contents: read
 
 jobs:
-  credo-check:
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@main
-
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
         with:
-          otp-version: '24'
-          elixir-version: '1.12'
+          otp-version: 24
+          elixir-version: 1.12
 
       - name: Install Dependencies
-        run: |
-          mix local.rebar --force
-          mix local.hex --force
-          mix deps.get
+        run: mix deps.get
 
-      - id: run-action
+      - name: Make script executable
+        run: chmod +x ./scripts/credo_to_sarif.sh
+
+      - name: Run Credo
         uses: yevh/credo-action@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
