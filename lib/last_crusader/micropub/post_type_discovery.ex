@@ -1,0 +1,188 @@
+defmodule LastCrusader.Micropub.PostTypeDiscovery do
+  @moduledoc """
+    Indieweb Post Type discovery implementation
+
+    see https://indieweb.org/post-type-discovery
+
+    Post Type Discovery specifies an algorithm for consuming code to determine the type of a post by its content properties and their values rather than an explicit “post type” property, thus better matched to modern post creation UIs that allow combining text, media, etc in a variety of ways without burdening users with any notion of what kind of post they are creating.
+
+    The Post Type Discovery algorithm ("the algorithm") discovers the type of a post given a data structure representing a post with a flat set of properties (e.g. Activity Streams (1.0 or 2.0) JSON, or JSON output from parsing [microformats2]), each with one or more values, by following these steps until reaching the first "it is a(n) ... post" statement at which point the "..." is the discovered post type.
+
+        1. If the post has an "rsvp" property with a valid value,
+        Then it is an RSVP post.
+        2. If the post has an "in-reply-to" property with a valid URL,
+        Then it is a reply post.
+        3. If the post has a "repost-of" property with a valid URL,
+        Then it is a repost (AKA "share") post.
+        4. If the post has a "like-of" property with a valid URL,
+        Then it is a like (AKA "favorite") post.
+        5. If the post has a "video" property with a valid URL,
+        Then it is a video post.
+        6. If the post has a "photo" property with a valid URL,
+        Then it is a photo post.
+        7. If the post has a "content" property with a non-empty value,
+        Then use its first non-empty value as the content
+        8. Else if the post has a "summary" property with a non-empty value,
+        Then use its first non-empty value as the content
+        9. Else it is a note post.
+        10. If the post has no "name" property
+          or has a "name" property with an empty string value (or no value)
+        Then it is a note post.
+        11. Take the first non-empty value of the "name" property
+        12. Trim all leading/trailing whitespace
+        13. Collapse all sequences of internal whitespace to a single space (0x20) character each
+        14. Do the same with the content
+        15. If this processed "name" property value is NOT a prefix of the processed content,
+        Then it is an article post.
+        16. It is a note post.
+
+    Quoted property names in the algorithm are defined in h-entry.
+  """
+  @type post_type() ::
+          :note | :article | :bookmark | :rvsp | :in_reply_to | :like_of | :video | :photo
+
+  @doc """
+    Discover the post type according to the official algorithm. Can be:
+
+    - `:note`
+    - `:article`
+    - `:bookmark`
+    - `:rvsp`
+    - `:in_reply_to`
+    - `:like_of`
+    - `:video`
+    - `:photo`
+  """
+  @spec discover(any()) :: post_type()
+  def discover(post)
+
+  def discover(m = %{rvsp: value}) do
+    case valid_rvsp_value(value) do
+      true -> :rvsp
+      _ -> pop_and_continue(:rvsp, m)
+    end
+  end
+
+  def discover(m = %{"in-reply-to": url}) do
+    case uri_valid?(url) do
+      true -> :in_reply_to
+      _ -> pop_and_continue("in-reply-to", m)
+    end
+  end
+
+  def discover(m = %{"repost-of": url}) do
+    case uri_valid?(url) do
+      true -> :repost_of
+      _ -> pop_and_continue("repost-of", m)
+    end
+  end
+
+  def discover(m = %{"bookmark-of": url}) do
+    case uri_valid?(url) do
+      true -> :bookmark
+      _ -> pop_and_continue("bookmark-of", m)
+    end
+  end
+
+  def discover(m = %{"like-of": url}) do
+    case uri_valid?(url) do
+      true -> :like_of
+      _ -> pop_and_continue("like-of", m)
+    end
+  end
+
+  def discover(m = %{video: url}) do
+    case uri_valid?(url) do
+      true -> :video
+      _ -> pop_and_continue(:video, m)
+    end
+  end
+
+  def discover(m = %{photo: url}) do
+    case uri_valid?(url) do
+      true -> :photo
+      _ -> pop_and_continue(:photo, m)
+    end
+  end
+
+  def discover(%{name: name, content: content}) when content != "" do
+    case is_name_a_title?(name, content) do
+      true -> :article
+      _ -> :note
+    end
+  end
+
+  def discover(%{name: name, summary: content}) do
+    case is_name_a_title?(name, content) do
+      true -> :article
+      _ -> :note
+    end
+  end
+
+  def discover(_) do
+    :note
+  end
+
+  @doc """
+  Determine whether the name property represents an explicit title.
+
+  see [one python implementation](https://github.com/kylewm/mf2util/blob/6e4c0dc904475b05381f618af9046e044a6c5f99/mf2util.py#L395)
+  because the official algo explanation is not clear at all (to me). I took documentation (and unit tests) from it:
+
+  Typically when parsing an h-entry, we check whether `p-name == e-content (value)`.
+  If they are non-equal, then p-name likely represents a title.
+
+  However, occasionally we come across an h-entry that does not
+  provide an explicit p-name. In this case, the name is
+  automatically generated by converting the entire h-entry content
+  to plain text. This definitely does not represent a title, and
+  looks very bad when displayed as such.
+
+
+  To handle this case, we broaden the equality check to see if
+  content is a subset of name. We also strip out non-alphanumeric
+  characters just to make the check a little more forgiving.
+  """
+  @spec is_name_a_title?(String.t(), String.t()) :: boolean()
+  def is_name_a_title?(name, content)
+
+  def is_name_a_title?(name, nil) when name != nil do
+    true
+  end
+
+  def is_name_a_title?(nil, _) do
+    false
+  end
+
+  def is_name_a_title?(name, content) do
+    not String.contains?(
+      strip_spaces_and_punctuation(name),
+      strip_spaces_and_punctuation(content)
+    )
+  end
+
+  defp valid_rvsp_value(value) do
+    String.downcase(value) in ["yes", "no", "maybe", "interested"]
+  end
+
+  defp pop_and_continue(key, map) when is_bitstring(key) do
+    String.to_existing_atom(key)
+    |> pop_and_continue(map)
+  end
+
+  defp pop_and_continue(key, map) do
+    {_, new_map} = Map.pop(map, key)
+    discover(new_map)
+  end
+
+  defp strip_spaces_and_punctuation(value) do
+    String.downcase(value)
+    |> String.replace(~r"[[:punct:]]", "")
+    |> String.replace(~r"[[:space:]]", "")
+  end
+
+  defp uri_valid?(url) do
+    %URI{scheme: scheme, host: host} = URI.parse(url)
+    scheme != nil && host != nil && host =~ "."
+  end
+end
