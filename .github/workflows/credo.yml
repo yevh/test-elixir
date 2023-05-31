@@ -1,5 +1,7 @@
 name: Reviewdog
+
 on: [pull_request]
+
 jobs:
   credo:
     name: Credo
@@ -7,14 +9,18 @@ jobs:
     container:
       image: elixir:1.12-slim
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab #v3.5.2
+      - name: Git configuration
+        run: git config --global --add safe.directory /github/workspace
       - name: Install Dependencies
         run: |
           mix local.rebar --force
           mix local.hex --force
           mix deps.get
-      - name: credo
+      - name: Run Credo
+        run: mix credo --format=flycheck --all --strict
+      - name: Credo reviewdog
         uses: yevh/reviewdog-action-credo@1d68a8bc263b3c09fc6db61641f4ba9aa0c3c027 #v1.3
         with:
           github_token: ${{ secrets.github_token }}
-          reporter: github-pr-check
+          reporter: github-pr-review
