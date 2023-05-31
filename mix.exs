@@ -25,7 +25,8 @@ defmodule SimpleApp.MixProject do
       {:tesla, "~> 1.4.0"},
       {:hackney, "~> 1.16.0"},
       {:jason, ">= 1.0.0"},
-      {:plug_cowboy, "~> 2.0"}
+      {:plug_cowboy, "~> 2.0"},
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
     ]
   end
 end
