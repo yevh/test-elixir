@@ -36,10 +36,10 @@ jobs:
           mix deps.get
 
       - id: run-action
-        uses: yevh/credo-action@94ff9c9294824cc1f9a77532ddb8a12654562e1b  #1.0
+        uses: yevh/credo-action@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
+          
       - name: Upload report
         uses: github/codeql-action/upload-sarif@d23060145bc9131d50558d5d4185494a20208101 #v2.12.5
         with:
