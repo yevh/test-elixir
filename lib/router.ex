@@ -1,4 +1,8 @@
 defmodule SimpleAppRouter do
+  @moduledoc """
+  Module responsible for defining the routes for SimpleApp.
+  """
+
   use Plug.Router
 
   plug :match
